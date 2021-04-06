@@ -26,12 +26,63 @@ blockAbove = true
 
 currentDirection = 0
 
+excavateXStart = 0
+excavateZStart = 0
+
 function excavateChunks(numberOfChunks)
-  excavateChunk()
+  excavateXStart, y, excavateZStart = gps.locate()
+  chunkCount = 0
+  perfectSquare = math.floor(math.sqrt(numberOfChunks))
+  remainder = numberOfChunks - math.pow(perfectSquare, 2)
+  chunkLines = perfectSquare
+  if remainder > 0 then
+    chunkLines = chunkLines + 1
+  end
+
+  for counter = 1, numberOfChunks
+  do
+    print(counter)
+    print(chunkLines)
+    print(excavateXStart)
+    print(excavateZStart)
+
+    local chunkCoordinates = findNextChunkStart(counter - 1, chunkLines, excavateXStart, excavateZStart)
+
+    print(chunkCoordinates[0])
+    print(chunkCoordinates[1])
+
+    moveTo(chunkCoordinates[0], 3, chunkCoordinates[1])
+    getDirection()
+    while currentDirection ~= 0 do
+      turnRight()
+    end
+    blockAbove = true
+    turnOdd = "left"
+    turnEven = "right"
+    excavateChunk()
+  end
+end
+
+function findNextChunkStart(chunksDone, chunkLines, startX, startZ)
+  local lineNumber = math.floor(chunksDone / chunkLines)
+  local lineEveness = lineNumber % 2
+  local linePosition = chunksDone % chunkLines
+  local lineOffset = 0
+
+  if lineEveness == 0 then
+    lineOffset = linePosition
+  else
+    lineOffset = chunkLines - linePosition - 1
+  end
+
+  local coordinates = {}
+  coordinates[0] = startX - (chunkLength * lineNumber)
+  coordinates[1] = startZ - (chunkLength * lineOffset)
+
+  return coordinates
 end
 
 function excavateChunk()
-  goToNewStart()
   while y < heightLimit and blockAbove do
     blockAbove = false
     excavateArea()
@@ -291,4 +342,5 @@ function excavateLine()
   turtle.digDown()
 end
 
-excavateChunk()
+-- excavateChunk()
+excavateChunks(7)
