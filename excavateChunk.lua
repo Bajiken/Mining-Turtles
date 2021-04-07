@@ -29,7 +29,7 @@ currentDirection = 0
 excavateXStart = 0
 excavateZStart = 0
 
-function excavateChunks(numberOfChunks)
+function excavateChunks(numberOfChunks, yHeight)
   excavateXStart, y, excavateZStart = gps.locate()
   chunkCount = 0
   perfectSquare = math.floor(math.sqrt(numberOfChunks))
@@ -51,7 +51,7 @@ function excavateChunks(numberOfChunks)
     print(chunkCoordinates[0])
     print(chunkCoordinates[1])
 
-    moveTo(chunkCoordinates[0], 3, chunkCoordinates[1])
+    moveTo(chunkCoordinates[0], yHeight, chunkCoordinates[1])
     getDirection()
     while currentDirection ~= 0 do
       turnRight()
@@ -90,8 +90,7 @@ function excavateChunk()
     moveUp()
     moveUp()
     y = y + 3
-    turtle.turnRight()
-    turtle.turnRight()
+    turn180()
     local temp = turnOdd
     turnOdd = turnEven
     turnEven = temp
@@ -207,6 +206,11 @@ function turnRight()
   currentDirection = (currentDirection + 1) % 4
 end
 
+function turn180()
+  turnRight()
+  turnRight()
+end
+
 function moveForward()
   local initialX, initialY, initialZ = gps.locate()
 
@@ -225,11 +229,9 @@ function moveForward()
 end
 
 function moveBackward()
-  turtle.turnRight()
-  turtle.turnRight()
+  turn180()
   moveForward()
-  turtle.turnRight()
-  turtle.turnRight()
+  turn180()
 end
 
 function moveUp()
@@ -264,27 +266,6 @@ function turn(direction)
   end
 end
 
-function goToStartLocation()
-  while y > 3 do
-    if turtle.detectDown() then
-      turtle.digDown()
-    end
-
-    turtle.down()
-    y = y - 1
-  end
-end
-
-function goToNewStart()
-  x, y, z = gps.locate()
-  moveTo(x - chunkLength, 3, z - chunkLength)
-  x, y, z = gps.locate()
-  getDirection()
-  while currentDirection ~= 0 do
-    turnRight()
-  end
-end
-
 function excavateArea()
   for counter = 1, chunkLength
   do
@@ -305,7 +286,7 @@ function excavateArea()
 end
 
 function excavateLine()
-  local counter = 1
+  local counter = 0
   while counter < chunkLength do
     while turtle.detectUp() do
       blockAbove = true
@@ -314,33 +295,63 @@ function excavateLine()
     turtle.digDown()
 
     local success, table = turtle.inspectUp()
-    if (table["name"] == "minecraft:lava" or table["name"] == "minecraft:water" or table["name"] == "minecraft:flowing_water" or table["name"] == "minecraft:flowing_lava" or table["name"] == "thermalfoundation:fluid_redstone" or table["name"] == "biomesoplenty:sand") and table["metadata"] == 0 then
+    if isNonSolidBlock(table["name"]) and table["metadata"] == 0 then
       moveUp()
       moveDown()
     end
 
     success, table = turtle.inspectDown()
-    if (table["name"] == "minecraft:lava" or table["name"] == "minecraft:water" or table["name"] == "minecraft:flowing_water" or table["name"] == "minecraft:flowing_lava" or table["name"] == "thermalfoundation:fluid_redstone" or table["name"] == "biomesoplenty:sand") and table["metadata"] == 0 then
+    if isNonSolidBlock(table["name"]) and table["metadata"] == 0 then
       moveDown()
       moveUp()
     end
 
-    if counter ~= chunkLength then
+    if counter ~= chunkLength - 1 then
       local moveSuccess = moveForward()
       if moveSuccess then
         counter = counter + 1
       else
         turtle.attack()
       end
+    else
+      counter = counter + 1
     end
   end
+end
 
-  while turtle.detectUp() do
-    blockAbove = true
-    turtle.digUp()
+function isNonSolidBlock(blockName)
+  local nonSolidBlocks = {"minecraft:lava", "minecraft:water", "minecraft:flowing_water",
+                          "minecraft:flowing_lava","thermalfoundation:fluid_redstone","biomesoplenty:sand"}
+
+  for _, block in ipairs(nonSolidBlocks) do
+    if block == blockName then
+      return true
+    end
   end
-  turtle.digDown()
+  return false
+end
+
+function split (inputstr, sep)
+    if sep == nil then
+            sep = "%s"
+    end
+    local t={}
+    for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+            table.insert(t, str)
+    end
+    return t
 end
 
 -- excavateChunk()
-excavateChunks(7)
+
+local modem = peripheral.wrap("right")
+local SERVER_PORT = 0
+local CLIENT_PORT = 1
+
+modem.open(CLIENT_PORT)
+
+event, side, senderChannel, replyChannel, msg, distance = os.pullEvent("modem_message")
+
+local params = split(msg, " ")
+
+excavateChunks(tonumber(params[1]), tonumber(params[2]))
