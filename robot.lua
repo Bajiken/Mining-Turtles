@@ -29,7 +29,7 @@ currentDirection = 0
 excavateXStart = 0
 excavateZStart = 0
 
-function excavateChunks(numberOfChunks, yHeight)
+function excavateChunks(chunksDone, robotChunks, numberOfChunks, yHeight)
   excavateXStart, y, excavateZStart = gps.locate()
   chunkCount = 0
   perfectSquare = math.floor(math.sqrt(numberOfChunks))
@@ -39,12 +39,17 @@ function excavateChunks(numberOfChunks, yHeight)
     chunkLines = chunkLines + 1
   end
 
-  for counter = 1, numberOfChunks
+  for counter = chunksDone + 1, chunksDone + robotChunks
   do
     print(counter)
     print(chunkLines)
     print(excavateXStart)
     print(excavateZStart)
+    refuel()
+
+    local payloadMessage = string.format("DONE FUELING")
+
+    modem.transmit(SERVER_PORT, CLIENT_PORT, payloadMessage)
 
     local chunkCoordinates = findNextChunkStart(counter - 1, chunkLines, excavateXStart, excavateZStart)
 
@@ -59,6 +64,7 @@ function excavateChunks(numberOfChunks, yHeight)
     blockAbove = true
     turnOdd = "left"
     turnEven = "right"
+    y = yHeight
     excavateChunk()
   end
 end
@@ -342,16 +348,48 @@ function split (inputstr, sep)
     return t
 end
 
+function refuel()
+  turtle.digDown()
+  turtle.select(1)
+  turtle.placeDown()
+  local fuelLevel = turtle.getFuelLevel()
+  while fuelLevel < 20000 do
+    turtle.suckDown()
+    local itemName = turtle.getItemDetail(1)
+
+    while itemName == "minecraft:bucket" do
+      turtle.dropDown()
+      os.sleep(2)
+      turtle.suckDown()
+      itemName = turtle.getItemDetail(1)
+    end
+
+    turtle.refuel()
+    turtle.dropDown()
+    fuelLevel = turtle.getFuelLevel()
+  end
+  turtle.digDown()
+end
+
 -- excavateChunk()
 
-local modem = peripheral.wrap("right")
-local SERVER_PORT = 0
-local CLIENT_PORT = 1
+modem = peripheral.wrap("right")
+SERVER_PORT = 0
+CLIENT_PORT = 1
 
 modem.open(CLIENT_PORT)
+
+local payloadMessage = string.format("READY")
+
+modem.transmit(SERVER_PORT, CLIENT_PORT, payloadMessage)
 
 event, side, senderChannel, replyChannel, msg, distance = os.pullEvent("modem_message")
 
 local params = split(msg, " ")
 
-excavateChunks(tonumber(params[1]), tonumber(params[2]))
+print(params[1])
+print(params[2])
+print(params[3])
+print(params[4])
+
+excavateChunks(tonumber(params[1]), tonumber(params[2]), tonumber(params[3]), tonumber(params[4]))
