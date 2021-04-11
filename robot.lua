@@ -29,7 +29,63 @@ currentDirection = 0
 excavateXStart = 0
 excavateZStart = 0
 
-function excavateChunks(chunksDone, robotChunks, numberOfChunks, yHeight)
+manageInventory = false
+
+function Set (list)
+  local set = {}
+    for _, l in ipairs(list) do set[l] = true end
+    return set
+end
+
+DROPPED_ITEMS = Set{
+        "minecraft:stone",
+        "minecraft:dirt",
+        "minecraft:cobblestone",
+        "minecraft:sand",
+        "minecraft:gravel",
+        "minecraft:redstone",
+        "minecraft:flint",
+        "minecraft:sandstone",
+        "chisel:basalt2",
+        "railcraft:ore_metal",
+        "extrautils2:ingredients",
+        "minecraft:dye",
+        "thaumcraft:nugget",
+        "thaumcraft:crystal_essence",
+        "thermalfoundation:material",
+        "projectred-core:resource_item",
+        "thaumcraft:ore_cinnabar",
+        "deepresonance:resonating_ore",
+        "forestry:apatite"
+}
+
+function dropItems()
+  local keptItems = 0
+  for slot = 1, 16 do
+    local item = turtle.getItemDetail(slot)
+    if item ~= nil then
+      if DROPPED_ITEMS[item["name"]] then
+        turtle.select(slot)
+        turtle.dropDown()
+      else
+        keptItems = keptItems + 1
+      end
+    end
+  end
+
+  if keptItems > 9 then
+    turtle.select(2)
+    turtle.placeDown()
+    for counter = 3, 16 do
+      turtle.select(counter)
+      turtle.dropDown()
+    end
+    turtle.select(2)
+    turtle.digDown()
+  end
+end
+
+function excavateChunks(chunksDone, robotChunks, numberOfChunks, startHeight, stopHeight)
   excavateXStart, y, excavateZStart = gps.locate()
   chunkCount = 0
   perfectSquare = math.floor(math.sqrt(numberOfChunks))
@@ -56,7 +112,7 @@ function excavateChunks(chunksDone, robotChunks, numberOfChunks, yHeight)
     print(chunkCoordinates[0])
     print(chunkCoordinates[1])
 
-    moveTo(chunkCoordinates[0], yHeight, chunkCoordinates[1])
+    moveTo(chunkCoordinates[0], startHeight, chunkCoordinates[1])
     getDirection()
     while currentDirection ~= 0 do
       turnRight()
@@ -64,8 +120,8 @@ function excavateChunks(chunksDone, robotChunks, numberOfChunks, yHeight)
     blockAbove = true
     turnOdd = "left"
     turnEven = "right"
-    y = yHeight
-    excavateChunk()
+    y = startHeight
+    excavateChunk(stopHeight)
   end
 end
 
@@ -88,8 +144,8 @@ function findNextChunkStart(chunksDone, chunkLines, startX, startZ)
   return coordinates
 end
 
-function excavateChunk()
-  while y < heightLimit and blockAbove do
+function excavateChunk(stopHeight)
+  while y < stopHeight and blockAbove do
     blockAbove = false
     excavateArea()
     moveUp()
@@ -323,6 +379,9 @@ function excavateLine()
       counter = counter + 1
     end
   end
+  if manageInventory then
+    dropItems()
+  end
 end
 
 function isNonSolidBlock(blockName)
@@ -373,7 +432,7 @@ end
 
 -- excavateChunk()
 
-modem = peripheral.wrap("right")
+modem = peripheral.wrap("left")
 SERVER_PORT = 0
 CLIENT_PORT = 1
 
@@ -392,4 +451,4 @@ print(params[2])
 print(params[3])
 print(params[4])
 
-excavateChunks(tonumber(params[1]), tonumber(params[2]), tonumber(params[3]), tonumber(params[4]))
+excavateChunks(tonumber(params[1]), tonumber(params[2]), tonumber(params[3]), tonumber(params[4]), tonumber(params[5]))
