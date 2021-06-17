@@ -1,6 +1,20 @@
 -- Issues
 -- Sand, gravel falling on top of the robot
 -- Sand, gravel falling down into the hole
+-- Robot gets blocked by something/mob
+-- Robot destroys other robot
+-- Robots do not go to bedrock roof in the nether
+
+-- Robot destroys other robot with getting direction
+-- Robot running out of fuel - lower the fuel threshold
+-- Check that robots dont use all coal for refuel
+
+-- Survival
+-- Use coal for fuel
+-- Return to original spot
+
+-- Nether height is 126 for max
+
 
 -- Notes
 -- z cordinate increases, we are going south
@@ -10,6 +24,9 @@
 
 chunkLength = 16
 heightLimit = 256
+minimumFuelLevel = 10
+
+-- slate, marble, andesite
 
 x, y, z = gps.locate()
 
@@ -17,6 +34,9 @@ turnOdd = "left"
 turnEven = "right"
 
 blockAbove = true
+nether = true
+lava = true
+stash = false
 
 -- directions = {}
 -- directions[0] = "north"
@@ -28,8 +48,9 @@ currentDirection = 0
 
 excavateXStart = 0
 excavateZStart = 0
+excavateYStart = 0
 
-manageInventory = false
+manageInventory = true
 
 function Set (list)
   local set = {}
@@ -56,7 +77,14 @@ DROPPED_ITEMS = Set{
         "projectred-core:resource_item",
         "thaumcraft:ore_cinnabar",
         "deepresonance:resonating_ore",
-        "forestry:apatite"
+        "forestry:apatite",
+        "chisel:marble2",
+        "rustic:slate",
+        "biomesoplenty:gem",
+        "chisel:limestone2",
+        "thaumcraft:amber",
+        "railcraft:ore_metal_poor",
+        "minecraft:clay_ball"
 }
 
 function dropItems()
@@ -73,7 +101,7 @@ function dropItems()
     end
   end
 
-  if keptItems > 9 then
+  if stash and keptItems > 9 then
     turtle.select(2)
     turtle.placeDown()
     for counter = 3, 16 do
@@ -83,10 +111,24 @@ function dropItems()
     turtle.select(2)
     turtle.digDown()
   end
+  turtle.select(1)
+end
+
+function stashInventory()
+  turtle.select(2)
+  turtle.placeDown()
+  for slot = 3, 16 do
+    turtle.select(slot)
+    turtle.dropDown()
+  end
+  turtle.select(2)
+  turtle.digDown()
 end
 
 function excavateChunks(chunksDone, robotChunks, numberOfChunks, startHeight, stopHeight)
-  excavateXStart, y, excavateZStart = gps.locate()
+  excavateXStart, excavateYStart, excavateZStart = gps.locate()
+  y = excavateYStart
+  excavateZStart = excavateZStart - 1
   chunkCount = 0
   perfectSquare = math.floor(math.sqrt(numberOfChunks))
   remainder = numberOfChunks - math.pow(perfectSquare, 2)
@@ -101,7 +143,7 @@ function excavateChunks(chunksDone, robotChunks, numberOfChunks, startHeight, st
     print(chunkLines)
     print(excavateXStart)
     print(excavateZStart)
-    refuel()
+    checkFuel()
 
     local payloadMessage = string.format("DONE FUELING")
 
@@ -123,6 +165,12 @@ function excavateChunks(chunksDone, robotChunks, numberOfChunks, startHeight, st
     y = startHeight
     excavateChunk(stopHeight)
   end
+
+  if manageInventory then
+    stashInventory()
+  end
+
+  moveToY(excavateXStart, excavateYStart, excavateZStart)
 end
 
 function findNextChunkStart(chunksDone, chunkLines, startX, startZ)
@@ -145,17 +193,23 @@ function findNextChunkStart(chunksDone, chunkLines, startX, startZ)
 end
 
 function excavateChunk(stopHeight)
-  while y < stopHeight and blockAbove do
+  while y < stopHeight and (blockAbove or nether) do
     blockAbove = false
     excavateArea()
-    moveUp()
-    moveUp()
-    moveUp()
-    y = y + 3
+    local counter = 0
+    while counter < 3 do
+      local moveSuccess = moveUpGuaranteed()
+      if moveSuccess then
+        counter = counter + 1
+      end
+    end
+    _, y, _ = gps.locate()
     turn180()
-    local temp = turnOdd
-    turnOdd = turnEven
-    turnEven = temp
+    if chunkLength % 2 == 0 then
+      local temp = turnOdd
+      turnOdd = turnEven
+      turnEven = temp
+    end
   end
 end
 
@@ -189,6 +243,13 @@ function moveTo(endX, endY, endZ)
   moveY(y, endY)
 end
 
+function moveToY(endX, endY, endZ)
+  x, y, z = gps.locate()
+  moveY(y, endY)
+  moveX(x, endX)
+  moveZ(z, endZ)
+end
+
 function moveX(initialX, endX)
   if initialX == endX then
     return
@@ -201,7 +262,7 @@ function moveX(initialX, endX)
       turnRight()
     end
     while initialX > endX do
-      moveForward()
+      safeForward()
       initialX = initialX - 1
     end
  -- east
@@ -210,7 +271,7 @@ function moveX(initialX, endX)
       turnRight()
     end
     while initialX < endX do
-      moveForward()
+      safeForward()
       initialX = initialX + 1
     end
   end
@@ -224,13 +285,13 @@ function moveY(initialY, endY)
   -- down
   if initialY > endY then
     while initialY > endY do
-      moveDown()
+      safeDown()
       initialY = initialY - 1
     end
  -- up
   else
     while initialY < endY do
-      moveForward()
+      safeUp()
       initialY = initialY + 1
     end
   end
@@ -248,7 +309,7 @@ function moveZ(initialZ,  endZ)
       turnRight()
     end
     while initialZ > endZ do
-      moveForward()
+      safeForward()
       initialZ = initialZ - 1
     end
  -- south
@@ -257,7 +318,7 @@ function moveZ(initialZ,  endZ)
       turnRight()
     end
     while initialZ < endZ do
-      moveForward()
+      safeForward()
       initialZ = initialZ + 1
     end
   end
@@ -273,6 +334,54 @@ function turn180()
   turnRight()
 end
 
+function safeForward()
+  local _, table = turtle.inspect()
+  local counter = 0
+  while table["name"] == "computercraft:turtle_expanded" do
+    os.sleep(30)
+    counter = counter + 1
+    if counter > 2 then
+      print("Blocked by another turtle. Shutting down.")
+      dropItems()
+      os.shutdown()
+    end
+    _, table = turtle.inspect()
+  end
+  moveForwardGuaranteed()
+end
+
+function safeUp()
+  local _, table = turtle.inspectUp()
+  local counter = 0
+  while table["name"] == "computercraft:turtle_expanded" do
+    os.sleep(30)
+    counter = counter + 1
+    if counter > 2 then
+      print("Blocked by another turtle. Shutting down.")
+      dropItems()
+      os.shutdown()
+    end
+    _, table = turtle.inspectUp()
+  end
+  moveUpGuaranteed()
+end
+
+function safeDown()
+  local _, table = turtle.inspectDown()
+  local counter = 0
+  while table["name"] == "computercraft:turtle_expanded" do
+    os.sleep(30)
+    counter = counter + 1
+    if counter > 2 then
+      print("Blocked by another turtle. Shutting down.")
+      dropItems()
+      os.shutdown()
+    end
+    _, table = turtle.inspectDown()
+  end
+  moveDownGuaranteed()
+end
+
 function moveForward()
   local initialX, initialY, initialZ = gps.locate()
 
@@ -280,6 +389,7 @@ function moveForward()
     turtle.dig()
   end
   turtle.forward()
+  checkFuel()
 
   x, y, z = gps.locate()
 
@@ -290,17 +400,56 @@ function moveForward()
   end
 end
 
+function moveForwardGuaranteed()
+  local moveSuccess = moveForward()
+  while not moveSuccess do
+    turtle.attack()
+    moveSuccess = moveForward()
+  end
+  return moveSuccess
+end
+
+function moveDownGuaranteed()
+  local moveSuccess = moveDown()
+  while not moveSuccess do
+    turtle.attackDown()
+    moveSuccess = moveDown()
+  end
+  return moveSuccess
+end
+
+function moveUpGuaranteed()
+  local moveSuccess = moveUp()
+  while not moveSuccess do
+    turtle.attackUp()
+    moveSuccess = moveUp()
+  end
+  return moveSuccess
+end
+
 function moveBackward()
   turn180()
   moveForward()
+  checkFuel()
   turn180()
 end
 
 function moveUp()
+  local initialX, initialY, initialZ = gps.locate()
+
   while turtle.detectUp() do
     turtle.digUp()
   end
   turtle.up()
+  checkFuel()
+
+  x, y, z = gps.locate()
+
+  if y == initialY then
+    return false
+  else
+    return true
+  end
 end
 
 function moveDown()
@@ -310,6 +459,7 @@ function moveDown()
     turtle.digDown()
   end
   turtle.down()
+  checkFuel()
 
   x, y, z = gps.locate()
 
@@ -317,6 +467,17 @@ function moveDown()
     return false
   else
     return true
+  end
+end
+
+function checkFuel()
+  local fuelLevel = turtle.getFuelLevel()
+  if fuelLevel < minimumFuelLevel then
+    if lava then
+       refuel()
+    else
+      coalRefuel()
+    end
   end
 end
 
@@ -336,11 +497,11 @@ function excavateArea()
     if counter ~= chunkLength then
       if counter % 2 == 1 then
         turn(turnOdd)
-        moveForward()
+        moveForwardGuaranteed()
         turn(turnOdd)
       else
         turn(turnEven)
-        moveForward()
+        moveForwardGuaranteed()
         turn(turnEven)
       end
     end
@@ -350,7 +511,8 @@ end
 function excavateLine()
   local counter = 0
   while counter < chunkLength do
-    while turtle.detectUp() do
+    local _, table = turtle.inspectUp()
+    while table["name"] ~= "minecraft:bedrock" and turtle.detectUp() do
       blockAbove = true
       turtle.digUp()
     end
@@ -380,7 +542,7 @@ function excavateLine()
     end
   end
   if manageInventory then
-    dropItems()
+    stashInventory()
   end
 end
 
@@ -408,26 +570,57 @@ function split (inputstr, sep)
 end
 
 function refuel()
-  turtle.digDown()
+  turtle.digUp()
   turtle.select(1)
-  turtle.placeDown()
+  turtle.placeUp()
+  local _, table = turtle.inspectUp()
+  while table["name"] ~= "enderstorage:ender_storage" do
+    turtle.digUp()
+    turtle.attackUp()
+    turtle.placeUp()
+  end
   local fuelLevel = turtle.getFuelLevel()
-  while fuelLevel < 20000 do
-    turtle.suckDown()
-    local itemName = turtle.getItemDetail(1)
+  while fuelLevel < 2000 do
+    turtle.suckUp()
+    local itemDetails = turtle.getItemDetail(1)
 
-    while itemName == "minecraft:bucket" do
-      turtle.dropDown()
+    while itemDetails == nil or itemDetails["name"] == "minecraft:bucket" do
+      turtle.dropUp()
       os.sleep(2)
-      turtle.suckDown()
-      itemName = turtle.getItemDetail(1)
+      turtle.suckUp()
+      itemDetails = turtle.getItemDetail(1)
     end
 
     turtle.refuel()
-    turtle.dropDown()
+    turtle.dropUp()
     fuelLevel = turtle.getFuelLevel()
   end
-  turtle.digDown()
+  turtle.digUp()
+end
+
+function coalRefuel()
+  local fuelLevel = turtle.getFuelLevel()
+
+  while fuelLevel < minimumFuelLevel do
+    local slot = 1
+    while slot < 17 do
+      local item = turtle.getItemDetail(slot)
+      if item ~= nil and item["name"] == "minecraft:coal" then
+        turtle.select(slot)
+        turtle.refuel()
+        break
+      end
+
+      if slot == 16 then
+        print("No coal to use for fuel. Shutting down.")
+        os.shutdown()
+      end
+      slot = slot + 1
+    end
+    fuelLevel = turtle.getFuelLevel()
+  end
+
+  turtle.refuel()
 end
 
 -- excavateChunk()
@@ -450,5 +643,9 @@ print(params[1])
 print(params[2])
 print(params[3])
 print(params[4])
+
+if params[6] ~= nil then
+  chunkLength = tonumber(params[6])
+end
 
 excavateChunks(tonumber(params[1]), tonumber(params[2]), tonumber(params[3]), tonumber(params[4]), tonumber(params[5]))
