@@ -126,7 +126,7 @@ function stashInventory()
 end
 
 function excavateChunks(chunksDone, robotChunks, numberOfChunks, startHeight, stopHeight)
-  excavateXStart, excavateYStart, excavateZStart = gps.locate()
+  excavateXStart, excavateYStart, excavateZStart = getGpsCoordinates()
   y = excavateYStart
   excavateZStart = excavateZStart - 1
   chunkCount = 0
@@ -203,7 +203,7 @@ function excavateChunk(stopHeight)
         counter = counter + 1
       end
     end
-    _, y, _ = gps.locate()
+    _, y, _ = getGpsCoordinates()
     turn180()
     if chunkLength % 2 == 0 then
       local temp = turnOdd
@@ -214,12 +214,12 @@ function excavateChunk(stopHeight)
 end
 
 function getDirection()
-  local initialX, initialY, initialZ = gps.locate()
+  local initialX, initialY, initialZ = getGpsCoordinates()
   moveSuccess = moveForward()
   while not moveSuccess do
     moveSuccess = moveForward()
   end
-  x, y, z = gps.locate()
+  x, y, z = getGpsCoordinates()
 
   if initialZ > z then
     currentDirection = 0
@@ -237,14 +237,14 @@ function getDirection()
 end
 
 function moveTo(endX, endY, endZ)
-  x, y, z = gps.locate()
+  x, y, z = getGpsCoordinates()
   moveX(x, endX)
   moveZ(z, endZ)
   moveY(y, endY)
 end
 
 function moveToY(endX, endY, endZ)
-  x, y, z = gps.locate()
+  x, y, z = getGpsCoordinates()
   moveY(y, endY)
   moveX(x, endX)
   moveZ(z, endZ)
@@ -383,21 +383,11 @@ function safeDown()
 end
 
 function moveForward()
-  local initialX, initialY, initialZ = gps.locate()
-
   while turtle.detect() do
     turtle.dig()
   end
-  turtle.forward()
   checkFuel()
-
-  x, y, z = gps.locate()
-
-  if x == initialX and z == initialZ then
-    return false
-  else
-    return true
-  end
+  return turtle.forward()
 end
 
 function moveForwardGuaranteed()
@@ -435,39 +425,27 @@ function moveBackward()
 end
 
 function moveUp()
-  local initialX, initialY, initialZ = gps.locate()
-
   while turtle.detectUp() do
     turtle.digUp()
   end
-  turtle.up()
   checkFuel()
-
-  x, y, z = gps.locate()
-
-  if y == initialY then
-    return false
-  else
-    return true
-  end
+  return turtle.up()
 end
 
 function moveDown()
-  local initialX, initialY, initialZ = gps.locate()
-
   while turtle.detectDown() do
     turtle.digDown()
   end
-  turtle.down()
   checkFuel()
+  return turtle.down()
+end
 
-  x, y, z = gps.locate()
-
-  if y == initialY then
-    return false
-  else
-    return true
+function getGpsCoordinates()
+  local x, y, z = gps.locate()
+  while x == nil or y == nil or z == nil do
+    x, y, z = gps.locate()
   end
+  return x, y, z
 end
 
 function checkFuel()
@@ -578,6 +556,7 @@ function refuel()
     turtle.digUp()
     turtle.attackUp()
     turtle.placeUp()
+    _, table = turtle.inspectUp()
   end
   local fuelLevel = turtle.getFuelLevel()
   while fuelLevel < 2000 do
