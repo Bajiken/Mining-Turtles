@@ -604,6 +604,9 @@ end
 
 -- excavateChunk()
 
+checkFuel()
+safeForward()
+
 modem = peripheral.wrap("left")
 SERVER_PORT = 0
 CLIENT_PORT = 1
