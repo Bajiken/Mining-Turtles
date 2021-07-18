@@ -338,9 +338,9 @@ function safeForward()
   local _, table = turtle.inspect()
   local counter = 0
   while table["name"] == "computercraft:turtle_expanded" do
-    os.sleep(30)
+    os.sleep(10)
     counter = counter + 1
-    if counter > 2 then
+    if counter > 3 then
       print("Blocked by another turtle. Shutting down.")
       dropItems()
       os.shutdown()
