@@ -1,6 +1,6 @@
-local gps = {}
+local gpsRobot = {}
 
-function gps.getGpsCoordinates()
+function gpsRobot.getGpsCoordinates()
   local x, y, z = gps.locate()
   while x == nil or y == nil or z == nil do
     x, y, z = gps.locate()
@@ -8,4 +8,4 @@ function gps.getGpsCoordinates()
   return x, y, z
 end
 
-return gps
+return gpsRobot
