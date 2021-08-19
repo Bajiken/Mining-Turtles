@@ -1,0 +1,5 @@
+h = "FFF01F"
+values = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+newValues = [round(x / 16) for x in values]
+binaryValue = ["{0:05b}".format(x) for x in newValues]
+print(''.join(sentence))
