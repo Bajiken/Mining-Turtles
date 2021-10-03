@@ -90,9 +90,10 @@ function split (inputstr, sep)
 end
 
 local config = fs.open("config", "r")
+local project = config.readLine()
 local track = config.readLine()
 local gitPrefix = "https://raw.githubusercontent.com/Bajiken/Mining-Turtles/mainline/"
-wget("-f", gitPrefix .. "lights/Industry/" .. track, track)
+wget("-f", gitPrefix .. "lights/" .. project .. "/" .. track, track)
 
 local modemSide = config.readLine()
 local lightSide = config.readLine()
