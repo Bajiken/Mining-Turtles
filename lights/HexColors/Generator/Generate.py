@@ -19,7 +19,6 @@ def generateFile(bars, fileLocation, numFiles):
                 file.close()
         for index in range(1, numFiles + 1):
             if not index in barSet:
-                print(index)
                 file = open(fileLocation + str(index), "a")
                 notes = StaticBar("0").getNotes()
                 values = map(lambda x: x.getValue(), notes)
