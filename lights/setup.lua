@@ -42,8 +42,7 @@ end
 wget("https://raw.githubusercontent.com/Bajiken/Mining-Turtles/mainline/lights/client.lua", "startup")
 
 local file = fs.open("config", "w")
-file.write(arg[1])
-file.write(arg[2])
-file.write("back")
+file.write(arg[1] .. "\n")
+file.write("back\n")
 file.write("front")
 file.close()
