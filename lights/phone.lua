@@ -24,5 +24,4 @@ while counter < totalNotes do
     os.sleep(interval)
   end
   counter = counter + 1
-
 end
